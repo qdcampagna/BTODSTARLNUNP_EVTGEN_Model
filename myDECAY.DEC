@@ -1,0 +1,17 @@
+Decay anti-D*0
+1.000 anti-D0 pi0 VSS;
+Enddecay
+
+Decay D*0
+1.000 D0 pi0 VSS;
+Enddecay
+
+Decay D*+
+1    D0  pi+                        VSS;
+Enddecay
+
+Decay D*-
+1    anti-D0 pi-                    VSS;
+Enddecay
+
+End
