@@ -1,0 +1,249 @@
+
+/***********************************************************************
+ * Written by Alexei Sibidanov                                         *
+***********************************************************************/
+
+#include "EvtGenModels/EvtSemiLeptonicVectorAmpNP.hh"
+
+#include "EvtGenBase/EvtAmp.hh"
+#include "EvtGenBase/EvtDiracSpinor.hh"
+#include "EvtGenBase/EvtGenKine.hh"
+#include "EvtGenBase/EvtId.hh"
+#include "EvtGenBase/EvtPDL.hh"
+#include "EvtGenBase/EvtParticle.hh"
+#include "EvtGenBase/EvtPatches.hh"
+#include "EvtGenBase/EvtReport.hh"
+#include "EvtGenBase/EvtSemiLeptonicFF.hh"
+#include "EvtGenBase/EvtTensor4C.hh"
+#include "EvtGenBase/EvtVector4C.hh"
+
+EvtComplex asymProd(const EvtTensor4C &t1, const EvtTensor4C &t2){
+  //returns  eps_ijkl*t1(i,j)*t2(k,l);
+  // eps_ijkl is the antisymmetric Levi-Civita tensor
+  EvtComplex sum;
+  sum += t1.get(0,1)*t2.get(2,3);
+  sum -= t1.get(0,1)*t2.get(3,2);
+  sum -= t1.get(0,2)*t2.get(1,3);
+  sum += t1.get(0,2)*t2.get(3,1);
+  sum += t1.get(0,3)*t2.get(1,2);
+  sum -= t1.get(0,3)*t2.get(2,1);
+  sum -= t1.get(1,0)*t2.get(2,3);
+  sum += t1.get(1,0)*t2.get(3,2);
+  sum += t1.get(1,2)*t2.get(0,3);
+  sum -= t1.get(1,2)*t2.get(3,0);
+  sum -= t1.get(1,3)*t2.get(0,2);
+  sum += t1.get(1,3)*t2.get(2,0);
+  sum += t1.get(2,0)*t2.get(1,3);
+  sum -= t1.get(2,0)*t2.get(3,1);
+  sum -= t1.get(2,1)*t2.get(0,3);
+  sum += t1.get(2,1)*t2.get(3,0);
+  sum += t1.get(2,3)*t2.get(0,1);
+  sum -= t1.get(2,3)*t2.get(1,0);
+  sum -= t1.get(3,0)*t2.get(1,2);
+  sum += t1.get(3,0)*t2.get(2,1);
+  sum += t1.get(3,1)*t2.get(0,2);
+  sum -= t1.get(3,1)*t2.get(2,0);
+  sum -= t1.get(3,2)*t2.get(0,1);
+  sum += t1.get(3,2)*t2.get(1,0);
+  return sum;
+}
+
+void getFF(double mB, double mV, double q2,
+	   double &V, double &A0, double &A1, double &A2, double &T1, double &T2, double &T3 ){
+  // based on arXiv:1309.0301
+  const double
+    rho2Dst = 1.207, // +- 0.026 Eq 44
+    R1t = 1.403, // +- 0.033 Eq 44
+    R2t = 0.854, // +- 0.020 Eq 44
+    hA1t = 0.908; // +- 0.017 Eq 45;
+  /* Quark masses from PDG */
+  const double m_c = 1.27, // +- 0.02 GeV PDG
+    m_b = 4.18; // +- 0.025 GeV PDG
+
+  double rmB = 1/mB, rDstar = mV*rmB, r2Dstar = rDstar*rDstar;
+  double c = 0.5/sqrt(mB*mV), mBaV = mB + mV, mBsV = mB - mV, rmBaV = 1/mBaV, rmBsV = 1/mBsV;
+  double w = (mB*mB + mV*mV - q2)/(2*mB*mV), sqrtwa1 = sqrt(w+1), ws1 = w-1, ws12 = ws1*ws1;
+  double u = 1 + r2Dstar - 2*rDstar*w;
+  double z = (sqrtwa1 - sqrt(2))/(sqrtwa1 + sqrt(2));
+
+  //  double V1w = V1t*(1 - z*(8*rho2D - z*((51*rho2D - 10) - z*(252*rho2D - 84))));
+
+  double hA1w = hA1t*(1 - z*(8*rho2Dst - z*((53*rho2Dst - 15) - z*(231*rho2Dst - 91))));
+  double R1w = R1t - 0.12*ws1 + 0.05*ws12;
+  double R2w = R2t + 0.11*ws1 - 0.06*ws12;
+  double R3w = 1.22 - 0.052*ws1 + 0.026*ws12;
+  double hVw = R1w*hA1w;
+  double hA2w = (R2w - R3w)/(2*rDstar)*hA1w;
+  double hA3w = (R2w + R3w)*0.5*hA1w;
+
+  // arXiv:1309.0301 Eq 48b
+  double cA1 = (m_b-m_c)*rmBsV*hA1w, cV = (m_b+m_c)*rmBaV*hVw;
+  double hT1 = 0.5/u*((1-rDstar)*(1-rDstar)*(w+1)*cA1
+		  -(1+rDstar)*(1+rDstar)*(w-1)*cV);
+  double hT2 = 0.5*(1-r2Dstar)*(w+1)/u*(cA1 - cV);
+  double hT3 = -0.5/(u*(1+rDstar))*(2*rDstar*(w+1)*cA1
+				+(m_b-m_c)*rmBsV*u*(hA3w-rDstar*hA2w)
+				-(1+rDstar)*(1+rDstar)*cV);
+
+  // arXiv:1309.0301 Eq 39
+  T1 = mBaV*hT1 - mBsV*hT2;
+  T2 = (mBaV-q2*rmBaV)*hT1 - (mBsV-q2*rmBsV)*hT2;
+  T3 = mBsV*hT1 - mBaV*hT2 - 2*mBaV*mBsV*rmB*hT3;
+  T1 *= c;
+  T2 *= c;
+  T3 *= c;
+
+
+  V = c*mBaV*hVw;
+  A1 = c*(mBaV*mBaV-q2)/mBaV*hA1w;
+  A2 = c*mBaV*(hA3w+rDstar*hA2w);
+  A0 = c*((mBaV*mBaV-q2)/(2*mV)*hA1w - (mBaV*mBsV+q2)/(2*mB)*hA2w - (mBaV*mBsV-q2)/(2*mV)*hA3w);
+}
+
+static EvtId EM, MUM, TAUM, EP, MUP, TAUP, D0, D0B, DP, DM, DSM, DSP;
+static bool cafirst = true;
+using EvtGenFunctions::asymProd;
+void EvtSemiLeptonicVectorAmpNP::CalcAmp(EvtParticle* parent, EvtAmp& amp, EvtSemiLeptonicFF*){
+  //  return  SMCalcAmpVerb(parent, amp, FormFactors);
+  if(cafirst){
+    cafirst = false;
+    EM = EvtPDL::getId( "e-" ); EP = EvtPDL::getId( "e+" );
+    MUM = EvtPDL::getId( "mu-" ); MUP = EvtPDL::getId( "mu+" );
+    TAUM = EvtPDL::getId( "tau-" ); TAUP = EvtPDL::getId( "tau+" );
+    
+    D0 = EvtPDL::getId( "D0" ); D0B = EvtPDL::getId( "anti-D0" );
+    DP = EvtPDL::getId( "D+" ); DM = EvtPDL::getId( "D-" );
+    DSP = EvtPDL::getId( "D_s+" ); DSM = EvtPDL::getId( "D_s-" );
+  }
+  
+  EvtParticle
+    *pvm = parent->getDaug( 0 ), // vector meson
+    *plp = parent->getDaug( 1 ), // charged lepton
+    *pnu = parent->getDaug( 2 ); // neutrino
+  EvtId pId = parent->getId(), vId = pvm->getId(), lId = plp->getId();
+  
+  //Add the lepton and neutrino 4 momenta to find q2
+  EvtVector4R q = plp->getP4() + pnu->getP4();
+  double q2 = q.mass2(), m_V = pvm->mass(), m_B = parent->mass();
+  double m_BaV = m_B + m_V, m_BsV = m_B - m_V;
+  
+  double a1f, a2f, vf, a0f, a3f;
+  /*  Tensor form factors */
+  double T1, T2, T3;
+  getFF(m_B, m_V, q2, vf, a0f, a1f, a2f, T1, T2, T3);
+  a3f = ( m_BaV * a1f - m_BsV * a2f ) / ( 2.0 * m_V );
+
+  double c0 = T1;
+  double c1 = m_BaV*m_BsV/q2*(T1-T2);
+  double c2 = (T1 - T2 - T3*q2/(m_BaV*m_BsV))*2/q2;
+
+  if ( pId == D0 || pId == D0B || pId == DP || pId == DM || pId == DSP || pId == DSM)
+    vf = -vf;
+
+  EvtVector4R p( m_B, 0., 0., 0. );
+  const EvtVector4R &k = pvm->getP4();
+  EvtVector4R pak = p + k;
+  
+  EvtDiracSpinor
+    nu = pnu->spParentNeutrino(), lp0 = plp->spParent(0), lp1 = plp->spParent(1);
+  //  std::cout<<lp0<<" "<<nu<<std::endl;
+  /* Various lepton currents */
+  EvtComplex s1, s2, p1, p2;
+  EvtVector4C l1, l2, a1, a2;
+  EvtTensor4C z1, z2, w1, w2;
+  if ( lId == EM || lId == MUM || lId == TAUM ) {
+    s1 = EvtLeptonSCurrent( lp0, nu );
+    s2 = EvtLeptonSCurrent( lp1, nu );
+    p1 = EvtLeptonPCurrent( lp0, nu );
+    p2 = EvtLeptonPCurrent( lp1, nu );
+    EvtLeptonVandACurrents(l1, a1, lp0, nu);
+    EvtLeptonVandACurrents(l2, a2, lp1, nu);
+    z1 = EvtLeptonTCurrent( lp0, nu );
+    z2 = EvtLeptonTCurrent( lp1, nu );
+    w1 = EvtLeptonTACurrent( lp0, nu );
+    w2 = EvtLeptonTACurrent( lp1, nu );
+  } else if ( lId == EP || lId == MUP || lId == TAUP ) {
+    vf = -vf;
+    s1 = EvtLeptonSCurrent( nu, lp0 );
+    s2 = EvtLeptonSCurrent( nu, lp1 );
+    p1 = EvtLeptonPCurrent( nu, lp0 );
+    p2 = EvtLeptonPCurrent( nu, lp1 );
+    EvtLeptonVandACurrents(l1, a1, nu, lp0);
+    EvtLeptonVandACurrents(l2, a2, nu, lp1);
+    z1 = EvtLeptonTCurrent( nu, lp0 );
+    z2 = EvtLeptonTCurrent( nu, lp1 );
+    w1 = EvtLeptonTACurrent( nu, lp0 );
+    w2 = EvtLeptonTACurrent( nu, lp1 );
+  }
+
+  /* Quark masses from PDG */
+  double m_c = 1.27, m_b = 4.18;
+
+  /* SM model */
+  EvtComplex C9 = 0.5, C10 = -0.5;
+  
+  /* New Physics */
+  // C9 += _dc9;
+  // C10 += _dc10;
+  // EvtComplex C9p = _c9p, C10p = _c10p,
+  //   CSSp = _cSSp, // = C_S - C'_S =  C_S_R/2 - C_S_L/2
+  //   CPPp = _cPPp, // = C_P - C'_P = -C_S_R/2 + C_S_L/2
+  //   CT = _cT, CT5 = _cT5;
+  EvtComplex C_V_L = _Cvl,
+    C_V_R = _Cvr,
+    C_S_L = _Csl, 
+    C_S_R = _Csr, 
+    C_T = _cT;
+  //C_V_L += _Cvl;
+  //  std::cout<<C_V_L<<" "<<C_V_R<<" "<<C_S_L<<" "<<C_S_R<<" "<<C_T<<std::endl;
+  /*Eq 12 Axial vector hadronic tensor*/
+  EvtTensor4C tA = (a1f * m_BaV) * EvtTensor4C::g(); 
+  tA.addDirProd( -(a2f/m_BaV) * p, pak);
+  tA.addDirProd( -2 * m_V/q2 * (a3f - a0f) * p, q);
+
+  /*Eq 11 Vector hadronic tensor*/
+  EvtTensor4C tV = EvtComplex( 0.0, 2*vf/m_BaV ) * asymProd(p, k);
+
+  // C9*PL + C9p*PR = C9*(1-g5)/2 + C9p*(1+g5)/2 = (C9+C9p)/2 + (C9p-C9)/2 * g5
+  // EvtTensor4C t9 = 0.5*(C9 + C9p)*tV + 0.5*(C9p - C9)*tA;
+  // EvtTensor4C t10 = 0.5*(C10 + C10p)*tV + 0.5*(C10p - C10)*tA;
+  EvtTensor4C t9 = 0.5*(C_V_L + C_V_R)*tV + 0.5*(C_V_R - C_V_L)*tA;
+  //  EvtTensor4C t10 = -t9;
+  
+  /*Eq 13 Pseudoscalar hadronic vector*/
+  /*Scalar hadronic vector is zero*/
+  EvtComplex tS = (-0.5*(C_S_R - C_S_L) * 2*m_V/(m_b + m_c)*a0f);
+  //  EvtComplex tP = -tS;
+
+  // w1 *= CT;
+  // w2 *= CT;
+  //  std::cout<<z1<<w1<<std::endl;
+  // z1 -= w1;
+  // z2 -= w2;
+  // std::cout<<z1<<std::endl;
+  z1 *= C_T;
+  z2 *= C_T;
+
+  pak *= c0;
+  EvtVector4C qc1(q); qc1 *= c1;
+  EvtTensor4C tt;
+  for(int i=0;i<3;i++){
+    EvtVector4C eps = pvm->epsParent(i).conj(), epsT9 = t9.cont1( eps );
+    EvtComplex epsq = eps*q, epsqc2 = epsq*c2;
+
+    /*Eq 14 Tensor component */
+    for(int i2=0;i2<4;i2++){
+      for(int i3=0;i3<4;i3++){
+	tt.set(i2, i3, eps.get(i2)*(-pak.get(i3) + qc1.get(i3)) + p.get(i2)*k.get(i3)*epsqc2);
+      }
+    }
+    
+    EvtComplex sum1 = l1.cont(epsT9) - a1.cont(epsT9) + epsq*tS*(s1 - p1) + asymProd(z1,tt);
+    EvtComplex sum2 = l2.cont(epsT9) - a2.cont(epsT9) + epsq*tS*(s2 - p2) + asymProd(z2,tt);
+    // EvtComplex sum1 = asymProd(tt,z1);
+    // EvtComplex sum2 = asymProd(tt,z2);
+    amp.vertex( i, 0, sum1);
+    amp.vertex( i, 1, sum2);
+  }
+
+}
