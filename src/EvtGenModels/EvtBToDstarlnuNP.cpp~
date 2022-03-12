@@ -1,0 +1,106 @@
+/***********************************************************************
+ *  Written by Alexei Sibidanov                                        *
+ ***********************************************************************/
+
+#include "EvtGenModels/EvtBToDstarlnuNP.hh"
+
+#include "EvtGenBase/EvtGenKine.hh"
+#include "EvtGenBase/EvtPDL.hh"
+#include "EvtGenBase/EvtParticle.hh"
+
+#include "EvtGenModels/EvtISGW2FF.hh"
+#include "EvtGenModels/EvtSemiLeptonicVectorAmpNP.hh"
+
+using std::endl;
+
+std::string EvtBToDstarlnuNP::getName()
+{
+  return "BTODSTARLNUNP";
+}
+
+EvtDecayBase* EvtBToDstarlnuNP::clone()
+{
+  return new EvtBToDstarlnuNP;
+}
+
+void EvtBToDstarlnuNP::decay( EvtParticle* p )
+{
+  p->initializePhaseSpace( getNDaug(), getDaugs());
+  _calcamp->CalcAmp( p, _amp2, _ffmodel.get() );
+}
+
+void EvtBToDstarlnuNP::initProbMax()
+{
+  EvtId pId = getParentId(), mId = getDaug( 0 ), l1Id = getDaug( 1 ), l2Id = getDaug( 2 );
+  //This routine sets the _poleSize.
+  double mymaxprob = _calcamp->CalcMaxProb( pId, mId, l1Id, l2Id, _ffmodel.get(), 20);
+  setProbMax( mymaxprob );
+}
+
+void EvtBToDstarlnuNP::init()
+{
+  // First choose format of NP coefficients from the .DEC file
+  // Cartesian(x,y)(0) or Polar(R,phase)(1)
+  int n = getNArg();
+  if(!(n==0||(n-1)%3==0)){
+    EvtGenReport( EVTGEN_ERROR, "EvtGen" )
+      << "Error in parameters in the BTODSTARLNUNP decay model." << endl;
+    EvtGenReport( EVTGEN_ERROR, "EvtGen" )
+      << "Will terminate execution!" << endl;
+    ::abort();
+  }
+
+  checkNDaug( 3 );
+
+  //We expect the parent to be a scalar
+  //and the daughters to be D* l+ nu
+
+  checkSpinParent( EvtSpinType::SCALAR );
+  checkSpinDaughter( 1, EvtSpinType::DIRAC );
+  checkSpinDaughter( 2, EvtSpinType::NEUTRINO );
+
+  EvtId mId = getDaug( 0 );
+  EvtId IdDst0 = EvtPDL::getId("D*0"), IdaDst0 = EvtPDL::getId("anti-D*0"),
+    IdDstp = EvtPDL::getId("D*+"), IdDstm = EvtPDL::getId("D*-");
+  if ( mId != IdDst0 && mId != IdaDst0 && mId != IdDstp && mId != IdDstm ) {
+    EvtGenReport( EVTGEN_ERROR, "EvtGen" )
+      << "EvtBToDstarlnuNP generator expected a D* 1st daughter, found: "
+      << EvtPDL::name( getDaug( 0 ) )  << endl;
+    EvtGenReport( EVTGEN_ERROR, "EvtGen" )
+      << "Will terminate execution!" << endl;
+    ::abort();
+  }
+
+  _ffmodel = std::make_unique<EvtISGW2FF>();
+  _calcamp = std::make_unique<EvtSemiLeptonicVectorAmpNP>();
+
+  auto getInteger = [this](int i) -> int {
+    double a = getArg(i);
+    if(a-static_cast<int>(a) != 0){
+      EvtGenReport( EVTGEN_ERROR, "EvtGen" )
+	<< "Parameters is not integer in the BTODSTARLNUNP decay model: " << i<<" "<< a << endl;
+      EvtGenReport( EVTGEN_ERROR, "EvtGen" )
+	<< "Will terminate execution!" << endl;
+      ::abort();
+    }
+    return static_cast<int>(a);
+  };
+  EvtSemiLeptonicVectorAmpNP *amp =  static_cast<EvtSemiLeptonicVectorAmpNP*>(_calcamp.get());
+  if(n>0) { // parse arguments
+    int i = 0, coordsyst = getInteger( i++ );
+    while(i<n){
+      int id =  getInteger( i++ ); // New Physics cooeficient Id
+      double a0 = getArg(i++);
+      double a1 = getArg(i++);
+      EvtComplex c = (coordsyst)? EvtComplex(a0*cos(a1), a0*sin(a1)):EvtComplex(a0, a1);
+      if(id==0) amp->_Cvl = c; // 
+      if(id==1) amp->_Cvr = c; //
+      if(id==2) amp->_Csl = c; // C'_9eff -- right hand polarizations
+      if(id==3) amp->_Csr = c; // c'_10eff -- right hand polarizations
+      //if(id==4) amp->_cSSp = c; // (C_S - C'_S) -- scalar right and left polarizations
+      //if(id==5) amp->_cPPp = c; // (C_P - C'_P) -- pseudo-scalar right and left polarizations
+      if(id==4) amp->_cT = c; //
+      if(id==5) amp->_cT5 = c; //
+    }
+  }
+}
