@@ -1,0 +1,589 @@
+
+/***********************************************************************
+* Copyright 1998-2020 CERN for the benefit of the EvtGen authors       *
+*                                                                      *
+* This file is part of EvtGen.                                         *
+*                                                                      *
+* EvtGen is free software: you can redistribute it and/or modify       *
+* it under the terms of the GNU General Public License as published by *
+* the Free Software Foundation, either version 3 of the License, or    *
+* (at your option) any later version.                                  *
+*                                                                      *
+* EvtGen is distributed in the hope that it will be useful,            *
+* but WITHOUT ANY WARRANTY; without even the implied warranty of       *
+* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the        *
+* GNU General Public License for more details.                         *
+*                                                                      *
+* You should have received a copy of the GNU General Public License    *
+* along with EvtGen.  If not, see <https://www.gnu.org/licenses/>.     *
+***********************************************************************/
+
+#include "EvtGenBase/EvtGenKine.hh"
+
+#include "EvtGenBase/EvtConst.hh"
+#include "EvtGenBase/EvtPatches.hh"
+#include "EvtGenBase/EvtRandom.hh"
+#include "EvtGenBase/EvtReport.hh"
+#include "EvtGenBase/EvtVector4R.hh"
+#include "EvtGenBase/EvtParticle.hh"
+
+#include <iostream>
+#include <math.h>
+#include <algorithm>
+using std::endl;
+
+inline void orderdouble(double *x, int i, int j){
+  auto t = std::min(x[i],x[j]);
+  x[j] = std::max(x[i],x[j]);
+  x[i] = t;
+}
+
+#define Od(i,j) orderdouble(x,i,j)
+
+void sort15(double *x){
+ Od(0,1); Od(2,3); Od(4,5); Od(6,7); Od(8,9); Od(10,11); Od(12,13);
+ Od(0,2); Od(4,6); Od(8,10); Od(12,14); Od(1,3); Od(5,7); Od(9,11);
+ Od(0,4); Od(8,12); Od(1,5); Od(9,13); Od(2,6); Od(10,14); Od(3,7);
+ Od(0,8); Od(1,9); Od(2,10); Od(3,11); Od(4,12); Od(5,13); Od(6,14);
+ Od(5,10); Od(6,9); Od(3,12); Od(13,14); Od(7,11); Od(1,2); Od(4,8);
+ Od(1,4); Od(7,13); Od(2,8); Od(11,14);
+ Od(2,4); Od(5,6); Od(9,10); Od(11,13); Od(3,8); Od(7,12);
+ Od(6,8); Od(10,12); Od(3,5); Od(7,9); Od(3,4);
+ Od(5,6); Od(7,8); Od(9,10); Od(11,12);
+ Od(6,7); Od(8,9);
+}
+
+void sort14(double *x){
+  Od(0,1); Od(2,3); Od(4,5); Od(6,7); Od(8,9); Od(10,11); Od(12,13);
+  Od(0,2); Od(4,6); Od(8,10); Od(1,3); Od(5,7); Od(9,11);
+  Od(0,4); Od(8,12); Od(1,5); Od(9,13); Od(2,6); Od(3,7);
+  Od(0,8); Od(1,9); Od(2,10); Od(3,11); Od(4,12); Od(5,13);
+  Od(5,10); Od(6,9); Od(3,12); Od(7,11); Od(1,2); Od(4,8);
+  Od(1,4); Od(7,13); Od(2,8);
+  Od(2,4); Od(5,6); Od(9,10); Od(11,13); Od(3,8); Od(7,12);
+  Od(6,8); Od(10,12); Od(3,5); Od(7,9); Od(3,4);
+  Od(5,6); Od(7,8); Od(9,10); Od(11,12);
+  Od(6,7); Od(8,9);
+}
+
+void sort13(double *x){
+  Od(1,3); Od(5,11); Od(4,7); Od(8,9); Od(0,12); Od(6,10);
+  Od(1,4); Od(6,8); Od(9,10); Od(11,12); Od(0,5); Od(3,7);
+  Od(1,2); Od(5,9); Od(10,12); Od(0,6); Od(8,11);
+  Od(0,1); Od(4,5); Od(3,8); Od(2,6);
+  Od(1,2); Od(3,4); Od(6,7); Od(8,9); Od(5,11);
+  Od(1,3); Od(6,10); Od(2,4); Od(5,8); Od(9,11); Od(7,12);
+  Od(2,3); Od(4,6); Od(7,10);
+  Od(4,5); Od(7,9); Od(10,11); Od(6,8);
+  Od(3,4); Od(5,6); Od(7,8); Od(9,10);
+  Od(6,7); Od(8,9);
+}
+
+void sort12(double *x){
+  Od(0,1); Od(2,3); Od(4,5); Od(6,7); Od(8,9); Od(10,11);
+  Od(1,3); Od(5,7); Od(9,11); Od(0,2); Od(4,6); Od(8,10);
+  Od(5,9); Od(6,10); Od(1,2); Od(7,11); Od(0,4);
+  Od(1,5); Od(9,10); Od(2,6); Od(3,7); Od(4,8);
+  Od(5,9); Od(1,2); Od(6,10); Od(0,4); Od(7,11); Od(3,8);
+  Od(1,4); Od(7,10); Od(2,3); Od(5,6); Od(8,9);
+  Od(3,5); Od(6,8); Od(2,4); Od(7,9);
+  Od(3,4); Od(5,6); Od(7,8);
+}
+
+void sort11(double *x){
+  Od(0,9); Od(1,8); Od(2,7); Od(3,6); Od(4,5);
+  Od(0,3); Od(4,10); Od(1,2); Od(6,9); Od(7,8);
+  Od(0,1); Od(2,3); Od(5,8); Od(9,10); Od(6,7);
+  Od(1,2); Od(4,6); Od(8,10); Od(5,9);
+  Od(0,4); Od(7,8); Od(1,5); Od(2,9); Od(3,6);
+  Od(1,4); Od(5,7); Od(2,3); Od(6,9);
+  Od(2,4); Od(6,7); Od(8,9); Od(3,5);
+  Od(3,4); Od(5,6); Od(7,8);
+}
+
+void sort10(double *x){
+  Od(1,8); Od(0,4); Od(5,9); Od(3,7); Od(2,6);
+  Od(0,3); Od(6,9); Od(4,7);
+  Od(0,1); Od(3,6); Od(8,9); Od(2,5);
+  Od(1,5); Od(7,9); Od(0,2); Od(4,8);
+  Od(1,2); Od(3,4); Od(5,6); Od(7,8);
+  Od(1,3); Od(6,8); Od(2,4); Od(5,7);
+  Od(2,3); Od(6,7);
+  Od(4,6); Od(3,5);
+  Od(4,5);
+}
+
+void sort9(double *x){
+  Od(1,2); Od(4,5); Od(7,8);
+  Od(0,1); Od(3,4); Od(6,7);
+  Od(1,2); Od(4,5); Od(7,8); Od(3,6);
+  Od(0,3); Od(5,8); Od(4,7);
+  Od(3,6); Od(2,5); Od(1,4);
+  Od(1,3); Od(5,8); Od(4,7); Od(2,6);
+  Od(5,7); Od(2,3); Od(4,6);
+  Od(3,4); Od(5,6);
+}
+
+void sort8(double *x){
+  Od(0,1); Od(2,3); Od(4,5); Od(6,7);
+  Od(1,3); Od(5,7); Od(0,2); Od(4,6);
+  Od(1,2); Od(5,6); Od(3,7);
+  Od(2,6); Od(1,5); Od(0,4);
+  Od(3,5); Od(2,4);
+  Od(1,2); Od(3,4); Od(5,6);
+}
+
+void sort7(double *x){
+  Od(1,2); Od(3,4); Od(5,6);
+  Od(0,2); Od(4,6); Od(3,5);
+  Od(2,6); Od(1,5); Od(0,4);
+  Od(2,5); Od(0,3);
+  Od(2,4); Od(1,3);
+  Od(0,1); Od(2,3); Od(4,5);
+}
+
+void sort6(double *x){
+  Od(0,1); Od(2,3); Od(4,5);
+  Od(0,2); Od(3,5); Od(1,4);
+  Od(0,1); Od(2,3); Od(4,5);
+  Od(1,2); Od(3,4);
+  Od(2,3);
+}
+
+void sort5(double *x){
+  Od(1,2); Od(3,4);
+  Od(1,3); Od(0,2);
+  Od(2,4); Od(0,3);
+  Od(0,1); Od(2,3);
+  Od(1,2);
+}
+
+void sort4(double *x){
+  Od(0,1); Od(2,3);
+  Od(0,2); Od(1,3);
+  Od(1,2);
+}
+
+void sort3(double *x){
+  Od(0,1);
+  Od(1,2);
+  Od(0,1);
+}
+
+void sort2(double *x){
+  Od(0,1);
+}
+
+void sort1(double *){
+}
+
+typedef void (fun_t)(double*);
+fun_t *sortfuns[] = {sort1, sort2, sort3, sort4, sort5, sort6, sort7, sort8, sort9, sort10, sort11, sort12, sort13, sort14, sort15};
+
+inline double sqr(double x){ return x*x;}
+
+// return s = sin and c = cos of phi = k/2^32*2*M_PI
+// tested that |s|<=1 and |c|<=1
+// max |s^2 + c^2 - 1| <= 4.440892e-16
+// max relative difference |s-s_true|/s_true < 1.716228e-15
+void __attribute__((noinline)) usincos(unsigned long kw, double &s, double &c){
+  const static double st[] =
+    {0, 4.90676743274180142550e-2, 9.80171403295606019942e-2, 1.46730474455361751659e-1,
+     1.95090322016128267848e-1, 2.42980179903263889948e-1, 2.90284677254462367636e-1,
+     3.36889853392220050689e-1, 3.82683432365089771728e-1, 4.27555093430282094321e-1,
+     4.71396736825997648556e-1, 5.14102744193221726594e-1, 5.55570233019602224743e-1,
+     5.95699304492433343467e-1, 6.34393284163645498215e-1, 6.71558954847018400625e-1,
+     7.07106781186547524401e-1, 7.40951125354959091176e-1, 7.73010453362736960811e-1,
+     8.03207531480644909807e-1, 8.31469612302545237079e-1, 8.57728610000272069902e-1,
+     8.81921264348355029713e-1, 9.03989293123443331586e-1, 9.23879532511286756128e-1,
+     9.41544065183020778413e-1, 9.56940335732208864936e-1, 9.70031253194543992604e-1,
+     9.80785280403230449126e-1, 9.89176509964780973452e-1, 9.95184726672196886245e-1,
+     9.98795456205172392715e-1, 1};
+  double x = (long)(kw<<(5+2)), x2 = x*x;
+  static const double
+    as[3] = { 2.661032484442617284e-21, -3.140503474026838861e-63,  1.111886075860967104e-105},
+    ac[3] = {-3.540546941629423600e-42,  2.089245440416171469e-84, -4.931274944723895814e-127};
+  unsigned k = (unsigned long)kw>>32;
+  int jk = (k+(1<<24))<<1, mask = jk>>31, absj = ((jk>>26)^mask)-mask;
+  double s0 = st[absj], c0 = st[32-absj];
+  static const double sign[2] = {1, -1};
+  s0 *= sign[(k+0)>>31];
+  c0 *= sign[(k+(1<<30))>>31];
+  double sn  =   (as[0] + x2*(as[1] + x2*(as[2])));
+  double dcs = x*(ac[0] + x2*(ac[1] + x2*(ac[2])));
+  s = s0 + x*(sn*c0 + dcs*s0);
+  c = c0 + x*(dcs*c0 - sn*s0);
+}
+
+// return s = sin and c = cos of phi = r*2*M_PI
+// 0 <= r < 1
+// minimal nonzero r is supposed to be 2^-53
+void rsincos(double r, double &s, double &c){
+  long kw = r*9007199254740992ul;
+  usincos(kw<<11, s, c);
+}
+
+
+double EvtGenKine::PhaseSpace( int ndaug, const double mass[30], EvtVector4R p4[30], double mp )
+
+//  N body phase space routine.  Send parent with
+//  daughters already defined ( Number and masses )
+//  Returns four vectors in parent frame.
+
+{
+    // Maximal weight scale -- based on numerical experiments
+    const static double wtscale[] =
+      {1.000000e+00, 1.000000e+00, 5.000707e-01, 1.924501e-01, 6.249988e-02, 1.789312e-02,
+       4.632982e-03, 1.104825e-03, 2.450442e-04, 5.095439e-05, 1.022054e-05,
+       1.834890e-06, 3.216923e-07, 5.540728e-08, 9.468573e-09};
+
+    if ( ndaug == 1 ) {
+        p4[0].set( mass[0], 0.0, 0.0, 0.0 );
+    } else if ( ndaug == 2 ) {
+      //Two body phase space
+      double en = ( mp * mp + mass[0] * mass[0] - mass[1] * mass[1] ) / ( 2.0 * mp );
+      double p3 = ( en > mass[0] ) ? sqrt( en * en - mass[0] * mass[0] ) : 0;
+
+      //Now uniformly distribute over sphere
+      double s, c; usincos(EvtRandom::urandom(), s, c);
+      double z = EvtRandom::random()*2 - 1, r = sqrt(1 - z*z);
+      double pt = p3*r, px = pt*c, py = pt*s, pz = p3*z;
+      p4[0].set(     en, px, py, pz );
+      p4[1].set(mp - en, -px, -py, -pz );
+    } else if ( ndaug == 3){
+#define ipck(i,j,k) (i|(j<<2)|(k<<4))
+      const static unsigned char indx[9] = {ipck(2,1,0),ipck(2,0,1),0,ipck(1,2,0),0,ipck(0,2,1),0,ipck(1,0,2),ipck(0,1,2)};
+#undef ipck
+      double m0 = mass[0], m1 = mass[1], m2 = mass[2];
+      unsigned i0 = (m0>m1) + (m0>m2);
+      unsigned i1 = (m1>=m0) + (m1>m2);
+      unsigned i2 = (m2>=m0) + (m2>=m1);
+      unsigned I = i0 + 3*(i1 + 3*i2), J = indx[(I-5)>>1], j0 = J&3, j1 = (J>>2)&3, j2 = (J>>4)&3;
+      //      printf("%u %u %u => %u %u %u  %u %u\n",i0,i1,i2,j0,j1,j2,J,I);
+      double wtmax = wtscale[ndaug-1]*wtscale[ndaug-1];
+      auto order = [](double &a, double &b) -> void { auto t = std::max(a, b); a = std::min(a, b); b = t;};
+      order(m0,m1);
+      order(m1,m2);
+      double u0 = m0 + m1, v0 = m0 - m1, M1max = mp - m2, M02 = sqr(M1max);
+      double u02 = u0*u0, v02 = v0*v0;
+      order(m0,m1);
+      double u1 = u0 + m2, v1 = u0 - m2, M12 = sqr(mp), dE = mp - u1;
+      if(dE<=0) {
+	printf("Not enough energy: Mtot = %f Etot = %f\n", u1, mp);
+	exit(-1);
+      }
+      wtmax /= M12*M02;
+      wtmax *= (M02 - u02)*(M02 - v02)*(M12 - u1*u1)*(M12 - v1*v1);
+
+      double wt, wtd, R, M1, p0, p1;
+      do {
+	M1 = u0 + dE*EvtRandom::random();
+	R = wtmax*sqr(EvtRandom::random());
+	double M02 = M1*M1;
+	p0 = (M02 - u02)*(M02 - v02);
+	double u1 = M1 + m2, v1 = M1 - m2;
+        p1 = (M12 - u1*u1)*(M12 - v1*v1);
+	wt = p0*p1;
+	wtd = M02*M12;
+      } while ( wt < wtd*R);
+      double iM1 = 1/M1;
+      p0 = sqrt(p0)*0.5*iM1;
+      p1 = sqrt(p1)/(2*mp);
+
+      // for tree particle decay all momenta lie in a plane so let us
+      // generate momenta in the x-y plane with the third particle
+      // momentum along x-axis and then randomly rotate them
+      double E3 = sqrt(p1*p1 + m2*m2);
+      double E12 = mp - E3;
+
+      // energies of particles 1 and 2 in their rest frame where they are back-to-back
+      double E1 = sqrt(p0*p0 + m0*m0), E2 = sqrt(p0*p0 + m1*m1);
+
+      // projection on the x-y plane of uniform rotations in 3D
+      double cth = EvtRandom::random()*2 - 1, sth = sqrt(1-cth*cth);
+      double px = p0*cth, py = p0*sth;
+
+      // boost 1 and 2 particle into the 1-2-3 rest frame
+      double g = E12*iM1, gb = p1*iM1;
+      double gpx = g*px, gbpx = gb*px;
+      double v0x = gpx - gb*E1, v0e = g*E1 - gbpx;
+      double v1x =-gpx - gb*E2, v1e = g*E2 + gbpx;
+      double v2x = p1;
+
+      double x,y; usincos(EvtRandom::urandom(), x, y);
+      double c,s; usincos(EvtRandom::urandom(), c, s);
+      double u = EvtRandom::random()*2, z = u - 1, r = sqrt(1-z*z);
+      double Rx = s*y-c*x, Ry = c*y+s*x, ux = u*x, uy = u*y;
+      double R00 = ux*Rx+c, R01 = s-ux*Ry,
+	R10 = uy*Rx-s, R11 = c-uy*Ry,
+	R20 =   -r*Rx, R21 =    r*Ry;
+      double pyx = R01*py, pyy = R11*py, pyz = R21*py;
+
+      p4[j0].set(v0e, R00*v0x + pyx, R10*v0x + pyy, R20*v0x + pyz);
+      p4[j1].set(v1e, R00*v1x - pyx, R10*v1x - pyy, R20*v1x - pyz);
+      p4[j2].set( E3, R00*v2x      , R10*v2x      , R20*v2x      );
+    } else if ( ndaug < 16 ) {
+      const int nmax = 15;
+      double M[nmax], rndf[nmax], p[nmax-1];
+      const double *m = mass;
+
+      double E0 = 0.0; for (int i = 0; i < ndaug; i++ ){ E0 += m[i]; M[i] = m[i];}
+      double dE = mp - E0;
+      if(dE<=0) {
+	printf("Not enough energy: Mtot = %f Etot = %f\n", E0, mp);
+	exit(-1);
+      }
+      rndf[0] = 0.0;
+      rndf[ndaug - 1] = 1;
+
+      double wtmax = wtscale[ndaug-1]*wtscale[ndaug-1];
+      //      std::sort(M, M + ndaug, std::less<double>());
+      sortfuns[ndaug-1](M);
+      m = M;
+      double Mmin = 0.0, Mmax = dE + m[0], wtmaxd = 1.0;
+      for (int i = 0; i<ndaug-1; i++ ) {
+	Mmin += m[i];
+	Mmax += m[i+1];
+	double u = Mmin + m[i+1], v = Mmin - m[i+1], M2 = Mmax*Mmax;
+	wtmax *= (M2 - u*u)*(M2 - v*v);
+	wtmaxd *= M2;
+      }
+      wtmax /= wtmaxd;
+      m = mass;
+      fun_t *sortfun = sortfuns[ndaug-3];
+      double wt, wtd, R;
+      do {
+	for (int i = 1; i < ndaug-1; i++ ) rndf[i] = EvtRandom::random();
+	sortfun(rndf+1);
+
+	wt = 1.0;
+	wtd = 1.0;
+	R = wtmax*sqr(EvtRandom::random());
+	double M0 = m[0];
+	int i = 1;
+	do {
+	  double f = rndf[i] - rndf[i-1];
+	  double m1 = m[i], M1 = m1 + M0 + f * dE;
+	  double ma = M0 + m1, ms = M0 - m1, M2 = M1*M1;
+	  double t = (M2 - ma*ma)*(M2 - ms*ms);
+	  wt *= t;
+	  wtd *= M2;
+	  p[i-1] = t;
+	  M[i] = M1;
+	  M0 = M1;
+	} while(++i<ndaug);
+      } while ( wt < wtd*R);
+
+      if( wt > wtd * wtmax) {
+	printf("Warning: current weight is higher than supposed maximum: %e > %e\n",
+	       sqrt(wt/wtd), sqrt(wtmax));
+      }
+
+      double *iM = rndf;
+      for (int i = 0; i<ndaug-1; i++){
+	iM[i+1] = 1/M[i+1];
+	p[i] = sqrt(p[i])*(0.5*iM[i+1]);
+      }
+
+      p4[0].set(sqrt(p[0]*p[0] + m[0]*m[0]), 0, p[0], 0 );
+      int i = 1;
+      while (1) {
+	p4[i].set(sqrt(p[i-1]*p[i-1] + m[i]*m[i]), 0, -p[i-1], 0 );
+
+	double cz = EvtRandom::random()*2 - 1, sz = sqrt(1 - cz*cz);
+	double sy, cy; usincos(EvtRandom::urandom(), sy, cy);
+	for (int j=0; j<=i; j++) {
+	  double x = p4[j].get(1), y = p4[j].get(2), z = p4[j].get(3);
+	  double xp = cz*x - sz*y, yp = sz*x + cz*y;   // rotation around z
+	  double zp = sy*xp + cy*z; xp = cy*xp - sy*z; // rotation around y
+	  p4[j].set(1,xp); p4[j].set(2,yp); p4[j].set(3,zp);
+	}
+
+	if (i == (ndaug-1)) break;
+
+	double E = sqrt(p[i]*p[i] + M[i]*M[i]), gamma = E * iM[i], betagamma = p[i] * iM[i];
+	for (int j=0; j<=i; j++){
+	  double e = p4[j].get(0), py = p4[j].get(2);
+	  p4[j].set(0, gamma*e + betagamma*py);
+	  p4[j].set(2, gamma*py + betagamma*e);
+	}
+	i++;
+      }
+    } else {
+      printf("No more than 15 particles! Ndaughter = %d", ndaug);
+      exit(-1);
+    }
+
+    return 1.0;
+}
+
+double PhaseSpacePole1( double M, double m1, double m2, double m3,
+                                   double a, EvtVector4R p4[10] )
+
+//  generate kinematics for 3 body decays, pole for the m1,m2 mass.
+{
+    //f1  = 1  (phasespace)
+    //f2  = a*(1/(p4[0]+p4[1])^2)
+
+  double m12sqmin = ( m1 + m2 ) * ( m1 + m2 ), m12sqmax = ( M - m3 ) * ( M - m3 );
+  double m13sqmin = ( m1 + m3 ) * ( m1 + m3 ), m13sqmax = ( M - m2 ) * ( M - m2 );
+  double d12 = m12sqmax - m12sqmin, d13 = m13sqmax - m13sqmin;
+  double M2 = M*M, m32 = m3*m3, m12 = m1*m1, m22 = m2*m2;
+  double c0 = M2 - m32, c1 = m12 - m22, c2 = m32 + m12;
+  double ab12 = log(m12sqmax/m12sqmin); // \int_m12sqmin^m12sqmax dx/x
+  double r = d12 / ( d12 + a * ab12 );
+  double m12sq, m13sq;
+  do {
+    double z0 = EvtRandom::random(), z1 = EvtRandom::random(), z2 = EvtRandom::random();
+    m13sq = m13sqmin + z0 * d13;
+    m12sq = ( r > z1 ) ? m12sqmin + z2 * d12 : m12sqmin*exp(z2*ab12);
+    double E3s = c0 - m12sq, E1s = m12sq + c1;
+    double w = 2 * m12sq, e = 4*m12sq;
+    double A = (m13sq - c2) * w - E3s * E1s;
+    double B = ( E3s * E3s - e * m32 )*( E1s * E1s - e * m12 );
+    if( A*A < B ) break;
+  } while (true);
+  double iM = 0.5/M;
+  double E2 = ( M2 + m22 - m13sq )*iM;
+  double E3 = ( M2 + m32 - m12sq )*iM;
+  double E1 = M - E2 - E3;
+  double p1 = sqrt( E1 * E1 - m12 );
+  double p3 = sqrt( E3 * E3 - m32 );
+  double cost13 = ( 2.0 * E1 * E3 + (m12 + m32 - m13sq) ) / ( 2.0 * p1 * p3 );
+
+  double px = p1 * cost13;
+  double v0x =  px;
+  double v1x = -px - p3;
+  double py  = p1 * sqrt( 1.0 - cost13 * cost13 );
+  double v2x = p3;
+
+  double x,y; usincos(EvtRandom::urandom(), x, y);
+  double c,s; usincos(EvtRandom::urandom(), c, s);
+  double u = EvtRandom::random()*2, z = u - 1, t = sqrt(1-z*z);
+  double Rx = s*y-c*x, Ry = c*y+s*x, ux = u*x, uy = u*y;
+  double R00 = ux*Rx+c, R01 = s-ux*Ry,
+    R10 = uy*Rx-s, R11 = c-uy*Ry,
+    R20 =   -t*Rx, R21 =    t*Ry;
+  double pyx = R01*py, pyy = R11*py, pyz = R21*py;
+
+  p4[0].set( E1, R00*v0x + pyx, R10*v0x + pyy, R20*v0x + pyz);
+  p4[1].set( E2, R00*v1x - pyx, R10*v1x - pyy, R20*v1x - pyz);
+  p4[2].set( E3, R00*v2x      , R10*v2x      , R20*v2x      );
+
+  return 1.0 + a / m12sq;
+}
+
+double EvtGenKine::PhaseSpacePole( double M, double m1, double m2, double m3,
+                                   double a, EvtVector4R p4[10] )
+
+//  generate kinematics for 3 body decays, pole for the m1,m2 mass.
+
+{
+  return PhaseSpacePole1(M, m1, m2, m3, a, p4);
+    //f1   = 1  (phasespace)
+    //f2   = a*(1/m12sq)^2 = a*(1/(p4[0]+p4[1])^4)
+
+  double m12sqmin = ( m1 + m2 ) * ( m1 + m2 ), m12sqmax = ( M - m3 ) * ( M - m3 );
+  double m13sqmin = ( m1 + m3 ) * ( m1 + m3 ), m13sqmax = ( M - m2 ) * ( M - m2 );
+  double d12 = m12sqmax - m12sqmin, d13 = m13sqmax - m13sqmin;
+  double M2 = M*M, m32 = m3*m3, m12 = m1*m1, m22 = m2*m2;
+  double c0 = M2 - m32, c1 = m12 - m22, c2 = m32 + m12;
+  double a12 = 1.0 / m12sqmin, ab12 = a12 - 1.0 / m12sqmax;
+  double r = d12 / ( d12 + a * ab12 );
+  double m12sq, m13sq;
+  do {
+    double z0 = EvtRandom::random(), z1 = EvtRandom::random(), z2 = EvtRandom::random();
+    m13sq = m13sqmin + z0 * d13;
+    m12sq = ( r > z1 ) ? m12sqmin + z2 * d12 : 1.0 / ( a12 -  z2 * ab12 );
+    double E3s = c0 - m12sq, E1s = m12sq + c1;
+    double w = 2 * m12sq, e = 4*m12sq;
+    double A = (m13sq - c2) * w - E3s * E1s;
+    double B = ( E3s * E3s - e * m32 )*( E1s * E1s - e * m12 );
+    if( A*A < B ) break;
+  } while (true);
+  double iM = 0.5/M;
+  double E2 = ( M2 + m22 - m13sq )*iM;
+  double E3 = ( M2 + m32 - m12sq )*iM;
+  double E1 = M - E2 - E3;
+  double p1 = sqrt( E1 * E1 - m12 );
+  double p3 = sqrt( E3 * E3 - m32 );
+  double cost13 = ( 2.0 * E1 * E3 + (m12 + m32 - m13sq) ) / ( 2.0 * p1 * p3 );
+
+  double px = p1 * cost13;
+  double v0x =  px;
+  double v1x = -px - p3;
+  double py  = p1 * sqrt( 1.0 - cost13 * cost13 );
+  double v2x = p3;
+
+  double x,y; usincos(EvtRandom::urandom(), x, y);
+  double c,s; usincos(EvtRandom::urandom(), c, s);
+  double u = EvtRandom::random()*2, z = u - 1, t = sqrt(1-z*z);
+  double Rx = s*y-c*x, Ry = c*y+s*x, ux = u*x, uy = u*y;
+  double R00 = ux*Rx+c, R01 = s-ux*Ry,
+    R10 = uy*Rx-s, R11 = c-uy*Ry,
+    R20 =   -t*Rx, R21 =    t*Ry;
+  double pyx = R01*py, pyy = R11*py, pyz = R21*py;
+
+  p4[0].set( E1, R00*v0x + pyx, R10*v0x + pyy, R20*v0x + pyz);
+  p4[1].set( E2, R00*v1x - pyx, R10*v1x - pyy, R20*v1x - pyz);
+  p4[2].set( E3, R00*v2x      , R10*v2x      , R20*v2x      );
+
+  return 1.0 + a / ( m12sq * m12sq );
+}
+
+/*
+ * Function which takes two invariant masses squared in 3-body decay and
+ * parent after makeDaughters() and generateMassTree() and
+ * calculates/generates momenta of daughters and sets those.
+ */
+void EvtGenKine::ThreeBodyKine( const double m12Sq, const double m23Sq,
+                                EvtParticle* p )
+{
+    const double mParent = p->mass();
+    EvtParticle* daug1 = p->getDaug( 0 );
+    EvtParticle* daug2 = p->getDaug( 1 );
+    EvtParticle* daug3 = p->getDaug( 2 );
+    const double mDaug1 = daug1->mass();
+    const double mDaug2 = daug2->mass();
+    const double mDaug3 = daug3->mass();
+    const double mParentSq{ mParent * mParent };
+    const double mDaug1Sq{ mDaug1 * mDaug1 };
+    const double mDaug2Sq{ mDaug2 * mDaug2 };
+    const double mDaug3Sq{ mDaug3 * mDaug3 };
+    const double invMParent{ 1. / mParent };
+
+    const double En1 = 0.5 * ( mParentSq + mDaug1Sq - m23Sq ) * invMParent;
+    const double En3 = 0.5 * ( mParentSq + mDaug3Sq - m12Sq ) * invMParent;
+    const double En2 = mParent - En1 - En3;
+    const double p1mag = sqrt( En1 * En1 - mDaug1Sq );
+    const double p2mag = sqrt( En2 * En2 - mDaug2Sq );
+    double cosPhi = 0.5 * ( mDaug1Sq + mDaug2Sq + 2 * En1 * En2 - m12Sq ) /
+                    ( p1mag * p2mag );
+
+    double sinPhi = sqrt( 1 - cosPhi * cosPhi );
+    if ( EvtRandom::Flat( 0., 1. ) > 0.5 ) {
+        sinPhi *= -1;
+    }
+    const double p2x = p2mag * cosPhi;
+    const double p2y = p2mag * sinPhi;
+    const double p3x = -p1mag - p2x;
+    const double p3y = -p2y;
+
+    // Construct 4-momenta and rotate them randomly in space
+    EvtVector4R p1( En1, p1mag, 0., 0. );
+    EvtVector4R p2( En2, p2x, p2y, 0. );
+    EvtVector4R p3( En3, p3x, p3y, 0. );
+    const double euler1 = EvtRandom::Flat( 0., EvtConst::twoPi );
+    const double euler2 = acos( EvtRandom::Flat( -1.0, 1.0 ) );
+    const double euler3 = EvtRandom::Flat( 0., EvtConst::twoPi );
+    p1.applyRotateEuler( euler1, euler2, euler3 );
+    p2.applyRotateEuler( euler1, euler2, euler3 );
+    p3.applyRotateEuler( euler1, euler2, euler3 );
+
+    // set momenta for daughters
+    daug1->init( daug1->getId(), p1 );
+    daug2->init( daug2->getId(), p2 );
+    daug3->init( daug3->getId(), p3 );
+
+    return;
+}
