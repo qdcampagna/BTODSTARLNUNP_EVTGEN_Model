@@ -1,0 +1,20 @@
+#need to turn off mixing to prevent B0 from becoming an anti-B0
+Define dm_incohMix_B0 0.0
+
+Decay B-
+1   D*0    e-   anti-nu_e   ISGW2;
+Enddecay
+
+Decay B+
+1   anti-D*0    e+   nu_e   ISGW2;
+Enddecay
+
+Decay anti-B0
+1   D*+    e-   anti-nu_e   ISGW2;
+Enddecay
+
+Decay B0
+1   D*-    e+   nu_e   ISGW2;
+Enddecay
+
+End
