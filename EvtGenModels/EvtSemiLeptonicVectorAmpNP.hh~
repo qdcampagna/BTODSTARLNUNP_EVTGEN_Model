@@ -1,0 +1,46 @@
+
+/***********************************************************************
+* Copyright 1998-2020 CERN for the benefit of the EvtGen authors       *
+*                                                                      *
+* This file is part of EvtGen.                                         *
+*                                                                      *
+* EvtGen is free software: you can redistribute it and/or modify       *
+* it under the terms of the GNU General Public License as published by *
+* the Free Software Foundation, either version 3 of the License, or    *
+* (at your option) any later version.                                  *
+*                                                                      *
+* EvtGen is distributed in the hope that it will be useful,            *
+* but WITHOUT ANY WARRANTY; without even the implied warranty of       *
+* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the        *
+* GNU General Public License for more details.                         *
+*                                                                      *
+* You should have received a copy of the GNU General Public License    *
+* along with EvtGen.  If not, see <https://www.gnu.org/licenses/>.     *
+***********************************************************************/
+
+#ifndef EVTSEMILEPTONICVECTORAMPNP_HH
+#define EVTSEMILEPTONICVECTORAMPNP_HH
+
+#include "EvtGenBase/EvtSemiLeptonicAmp.hh"
+#include "EvtGenBase/EvtComplex.hh"
+
+class EvtParticle;
+class EvtAmp;
+class EvtSemiLeptonicFF;
+
+class EvtSemiLeptonicVectorAmpNP : public EvtSemiLeptonicAmp {
+public:
+  //Daughters are initialized and have been added to the parent.
+  //No need to carry around the daughters seperately!
+  void CalcAmp( EvtParticle* parent, EvtAmp& amp, EvtSemiLeptonicFF* FormFactors ) override;
+  EvtComplex _dc9; // delta C_9eff -- addition to the SM value (1/2)
+  EvtComplex _dc10; // delta C_10eff -- addition to the SM value (-1/2)
+  EvtComplex _c9p; // C'_9eff -- right hand polarizations
+  EvtComplex _c10p; // C'_10eff -- right hand polarizations
+  EvtComplex _cSSp; // (C_S - C'_S) -- scalar right and left polarizations
+  EvtComplex _cPPp; // (C_P - C'_P) -- pseudo-scalar right and left polarizations
+  EvtComplex _cT; //  C_T
+  EvtComplex _cT5; // C_T5
+};
+
+#endif
