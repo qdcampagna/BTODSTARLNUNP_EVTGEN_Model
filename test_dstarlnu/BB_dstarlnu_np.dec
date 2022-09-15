@@ -1,0 +1,37 @@
+#need to turn off mixing to prevent B0 from becoming an anti-B0
+Define dm_incohMix_B0 0.0
+
+#Decay Upsilon(4S)
+#1 B+ B-                           VSS;
+#Enddecay
+
+Decay Upsilon(4S)
+1 B0 anti-B0			VSS;
+Enddecay
+
+## first argument is cartesian(0) or polar(1) representation of NP coefficients which
+## are the threee consecutive numbers {id, Re(C), Im(C)} or {coeff id, |C|, Arg(C)}
+## id==0 C_VL -- left-hand vector coefficient change from SM
+## id==1 C_VR -- right-hand vector coefficient
+## id==2 C_SL -- left-hand scalar coefficient
+## id==3 C_SR -- right-hand scalar coefficient
+## id==4 C_T
+
+#Decay B-
+#1   D*0    e-   anti-nu_e   BTODSTARLNUNP;
+#Enddecay
+
+#Decay B+
+#1   anti-D*0    e+   nu_e   BTODSTARLNUNP;
+#Enddecay
+
+#Decay anti-B0
+#1   D*+    e-   anti-nu_e   BTODSTARLNUNP;
+#Enddecay
+
+Decay B0
+#1   D*-    e+   nu_e   BTODSTARLNUNP;
+1   D*-    mu+   nu_mu   BTODSTARLNUNP 0 0 0.07 0 1 0.075 0;
+Enddecay
+
+End
