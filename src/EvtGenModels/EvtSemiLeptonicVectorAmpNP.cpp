@@ -9,8 +9,14 @@
  * alpha_s/pi, 1/mb, 1/mc and 1/mc^2 corrections included in the HQET FFs *
 **************************************************************************/
 
+/**************************************************************************
+ * Version date : 11th April, 2022                                        *
+ * BGL FF parametrization included *
+**************************************************************************/
+
 #include "EvtGenModels/EvtSemiLeptonicVectorAmpNP.hh"
 
+#include <cmath>
 #include "EvtGenBase/EvtAmp.hh"
 #include "EvtGenBase/EvtDiracSpinor.hh"
 #include "EvtGenBase/EvtGenKine.hh"
@@ -82,15 +88,55 @@ EvtComplex asymProd(const EvtTensor4C &t1, const EvtTensor4C &t2){
 }
 
 void getFF(double mB, double mV, double q2,
-	   double &V, double &A0, double &A1, double &A2, double &T1, double &T2, double &T3 ){
-/* // CLN FF Parameters based on arXiv:1309.0301
+	   double &V, double &A0, double &A1, double &A2, double &T1, double &T2, double &T3 ){ 
+	     
+  /* Quark masses from PDG */
+  const double m_c = 1.27, // +- 0.02 GeV PDG
+    m_b = 4.18; // +- 0.025 GeV PDG
+    
+  double rmB = 1/mB, rDstar = mV/mB, r2Dstar = rDstar*rDstar;
+  double c = 0.5/sqrt(mB*mV), mBaV = mB + mV, mBsV = mB - mV, rmBaV = 1/mBaV, rmBsV = 1/mBsV;
+  double w = (mB*mB + mV*mV - q2)/(2*mB*mV), wsq = w*w, sqrtwa1 = sqrt(w+1), ws1 = w-1, ws12 = ws1*ws1;
+  double u = 1 + r2Dstar - 2*rDstar*w;
+  double z = (sqrtwa1 - sqrt(2))/(sqrtwa1 + sqrt(2));
+
+
+/************************************************************************************/
+/* // CLN Parametrization of the FFs from 1309.0301 begin here :
+  
+   // CLN FF Parameters based on arXiv:1309.0301
     const double
     rho2Dst = 1.207, // +- 0.026 Eq 44
     R1t = 1.403, // +- 0.033 Eq 44
     R2t = 0.854, // +- 0.020 Eq 44
-    hA1t = 0.908; // +- 0.017 Eq 45;*/
+    hA1t = 0.908; // +- 0.017 Eq 45;
     
-/* // FF parameters based on Table 2 Column 1 (SM 3/2/1) arxiv:2004.10208
+  //  double V1w = V1t*(1 - z*(8*rho2D - z*((51*rho2D - 10) - z*(252*rho2D - 84))));
+  double hA1w = hA1t*(1 - z*(8*rho2Dst - z*((53*rho2Dst - 15) - z*(231*rho2Dst - 91))));
+  double R1w = R1t - 0.12*ws1 + 0.05*ws12;
+  double R2w = R2t + 0.11*ws1 - 0.06*ws12;
+  double R3w = 1.22 - 0.052*ws1 + 0.026*ws12;
+  double hVw = R1w*hA1w;
+  double hA2w = (R2w - R3w)/(2*rDstar)*hA1w;
+  double hA3w = (R2w + R3w)*0.5*hA1w;
+  
+ // arXiv:1309.0301 Eq 48b
+  double cA1 = (m_b-m_c)*rmBsV*hA1w, cV = (m_b+m_c)*rmBaV*hVw;
+  double hT1 = (0.5*((1-rDstar)*(1-rDstar)*(w+1)*cA1
+		  -(1+rDstar)*(1+rDstar)*(w-1)*cV))/u;
+  double hT2 = (0.5*(1-r2Dstar)*(w+1)*(cA1 - cV))/u;
+  double hT3 = (-0.5*(2*rDstar*(w+1)*cA1
+				+(m_b-m_c)*rmBsV*u*(hA3w-rDstar*hA2w)
+				-(1+rDstar)*(1+rDstar)*cV))/(u*(1+rDstar)); */
+
+// CLN Parametrization ends here.
+/************************************************************************************/
+
+
+/************************************************************************************/   
+// HQET Parametrization begins here : 
+ 
+ /* // HQET FF parameters based on Table 2 Column 1 (SM 3/2/1) arxiv:2004.10208
    const double 
    Xi0 = 1,
    Xi1 = -0.93, // +- 0.10
@@ -118,8 +164,8 @@ void getFF(double mB, double mV, double q2,
    lh60 = 4.96, // +- 5.76
    lh61 = 5.08; // +- 2.97 */
    
-// FF parameters based on Table 2 Column 4 (SM 2/1/0) arxiv:2004.10208
-   const double 
+ // HQET FF parameters based on Table 2 Column 4 (SM 2/1/0) arxiv:2004.10208
+/*   const double 
    Xi0 = 1,
    Xi1 = -1.10, // +- 0.04
    Xi2 = 1.57, // +- 0.10
@@ -145,20 +191,10 @@ void getFF(double mB, double mV, double q2,
    lh51 = 0,
    lh60 = 0.17, // +- 1.15
    lh61 = 0;
-   
-    
-  /* Quark masses from PDG */
-  const double m_c = 1.27, // +- 0.02 GeV PDG
-    m_b = 4.18; // +- 0.025 GeV PDG
-    
-  //Expansion coefficients for alpha_s, 1/m and 1/m^2 corrections (2004.10208 , below eq 10)
+ 
+   //Expansion coefficients for alpha_s, 1/m and 1/m^2 corrections (2004.10208 , below eq 10)
   const double epsa = 0.0716, epsb = 0.0522, epsc = 0.1807;
-
-  double rmB = 1/mB, rDstar = mV/mB, r2Dstar = rDstar*rDstar;
-  double c = 0.5/sqrt(mB*mV), mBaV = mB + mV, mBsV = mB - mV, rmBaV = 1/mBaV, rmBsV = 1/mBsV;
-  double w = (mB*mB + mV*mV - q2)/(2*mB*mV), wsq = w*w, sqrtwa1 = sqrt(w+1), ws1 = w-1, ws12 = ws1*ws1;
-  //double u = 1 + r2Dstar - 2*rDstar*w;
-  double z = (sqrtwa1 - sqrt(2))/(sqrtwa1 + sqrt(2));
+  
   //Some factors required for higher order corrections of the FFs
   double zcb = m_c/m_b, zcbsq = zcb*zcb;
   double wcb = 0.5*(zcb + 1/zcb);
@@ -167,27 +203,9 @@ void getFF(double mB, double mV, double q2,
   double rw = log(omep)/sqrt((w+1)*(w-1));
   double epscsq = epsc*epsc;
   double Omew = w*(2*EvtDiLog::DiLog(1-omem*zcb) - 2*EvtDiLog::DiLog(1-omep*zcb) + EvtDiLog::DiLog(1-omep*omep) - EvtDiLog::DiLog(1-omem*omem))/(2*sqrt(wsq-1)) - w*rw*log(zcb) + 1;
+  
   //double scalemusq = m_b*m_c;
     const double scalemusq = 4.2*4.2;
-
-  // CLN Parametrization of the FFs from 1309.0301
-  //  double V1w = V1t*(1 - z*(8*rho2D - z*((51*rho2D - 10) - z*(252*rho2D - 84))));
-/*double hA1w = hA1t*(1 - z*(8*rho2Dst - z*((53*rho2Dst - 15) - z*(231*rho2Dst - 91))));
-  double R1w = R1t - 0.12*ws1 + 0.05*ws12;
-  double R2w = R2t + 0.11*ws1 - 0.06*ws12;
-  double R3w = 1.22 - 0.052*ws1 + 0.026*ws12;
-  double hVw = R1w*hA1w;
-  double hA2w = (R2w - R3w)/(2*rDstar)*hA1w;
-  double hA3w = (R2w + R3w)*0.5*hA1w; */
-  
-/* // arXiv:1309.0301 Eq 48b
-  double cA1 = (m_b-m_c)*rmBsV*hA1w, cV = (m_b+m_c)*rmBaV*hVw;
-  double hT1 = (0.5*((1-rDstar)*(1-rDstar)*(w+1)*cA1
-		  -(1+rDstar)*(1+rDstar)*(w-1)*cV))/u;
-  double hT2 = (0.5*(1-r2Dstar)*(w+1)*(cA1 - cV))/u;
-  double hT3 = (-0.5*(2*rDstar*(w+1)*cA1
-				+(m_b-m_c)*rmBsV*u*(hA3w-rDstar*hA2w)
-				-(1+rDstar)*(1+rDstar)*cV))/(u*(1+rDstar)); */
   
   // The order alpha_s/pi corrections arxiv:1703.05330 Appendix A1 with scale factors taken from arxiv:2004.10208 Eq. 87-89
   double SFCV1 = -2*(w*rw -1)*log(m_b*m_c/scalemusq)/3;
@@ -297,8 +315,84 @@ void getFF(double mB, double mV, double q2,
   double hA3w = Xiw*hA3hat;
   double hT1 = Xiw*hT1hat;
   double hT2 = Xiw*hT2hat;
-  double hT3 = Xiw*hT3hat;
+  double hT3 = Xiw*hT3hat; */
   
+// HQET Parametrization ends here.
+/************************************************************************************/ 
+ 
+/************************************************************************************/
+  // BGL parametrization of the FF begins here :
+  //FF parameter values taken from 2111.01176
+  const double 
+   a0f = 0.0123, // +- 0.0001
+   a1f = 0.0222, // +- 0.0096
+   a2f = -0.522, // +- 0.196
+   a0g = 0.0318, // +- 0.0010
+   a1g = -0.133, // +- 0.063
+   a2g = -0.62,  // +- 1.46
+   a1F1 = 0.0021, // +- 0.0015 
+   a0F2 = 0.0515, // +- 0.0021
+   a1F2 = -0.149, // +- 0.059
+   a2F2 = 0.987, // +- 0.932
+   nI = 2.6,
+   chi1minT0 = 5.131e-4,
+   chi1plusT0 = 3.894e-4,
+   chi1plusL0 = 1.9421e-2; 
+  
+   double mP1plus[] = {6.739,6.750,7.145,7.150};
+   double mP1min[] = {6.329,6.920,7.020};
+   double mP0min[] = {6.275,6.842,7.250};
+   
+   double zP1plus[4], zP1min[3], zP0min[3];
+   
+   double P1plus = 1.0;
+   double P1min = 1.0;
+   double P0min = 1.0;
+   
+   for(int i=0; i<4; i++){
+        zP1plus[i] = (sqrt(mBaV*mBaV - mP1plus[i]*mP1plus[i]) - sqrt(4*mB*mDst))/(sqrt(mBaV*mBaV - mP1plus[i]*mP1plus[i]) + sqrt(4*mB*mDst));
+   	P1plus*= (z-zP1plus[i])/(1-z*zP1plus[i])
+   }
+   	
+   for(int i=0; i<3; i++){
+        zP1min[i] = (sqrt(mBaV*mBaV - mP1min[i]*mP1min[i]) - sqrt(4*mB*mDst))/(sqrt(mBaV*mBaV - mP1min[i]*mP1min[i]) + sqrt(4*mB*mDst));
+        zP0min[i] = (sqrt(mBaV*mBaV - mP0min[i]*mP0min[i]) - sqrt(4*mB*mDst))/(sqrt(mBaV*mBaV - mP0min[i]*mP0min[i]) + sqrt(4*mB*mDst));
+   	P1min*= (z-zP1min[i])/(1-z*zP1min[i]);
+   	P0min*= (z-zP0min[i])/(1-z*zP0min[i]);
+   }
+   
+   double phig = 16*r2Dstar*sqrt(nI/(3*M_PI*chi1minT0))*((pow(1+z,2))/(sqrt(1-z)*pow((1+rDstar)*(1-z)+2*sqrt(rDstar)*(1+z),4)));
+   double phif = 4*rDstar*sqrt(nI/(3*M_PI*chi1plusT0))*(((1+z)*(1-z)*sqrt(1-z))/(pow((1+rDstar)*(1-z)+2*sqrt(rDstar)*(1+z),4)))/(mB*mB);
+   double phiF1 = 4*rDstar*sqrt(nI/(6*M_PI*chi1plusT0))*(((1+z)*pow(1-z,2)*sqrt(1-z))/(pow((1+rDstar)*(1-z)+2*sqrt(rDstar)*(1+z),5)))/(pow(mB,3));
+   double phiF2 = 8*sqrt(2)*r2Dstar*sqrt(nI/(M_PI*chi1plusL0))*((pow(1+z,2))/(sqrt(1-z)*pow((1+rDstar)*(1-z)+2*sqrt(rDstar)*(1+z),4)));
+   
+   //Kinetic constraints :
+   const double a0F1 = (1-rDstar)/(sqrt(2)*pow(1+sqrt(rDstar),2)); // at w=1
+   const double a2F1 = -0.5162*(104.455*a0f+34.7622*a1F1-29.3161*(a0F2+0.0557*a1F2+0.0031*a2F2)); // obtained at w = wmax = 1.5 after substituting all other constants
+   
+   double gfunc = (a0g + a1g*z + a2g*z*z)/(P1min*phig);
+   double ffunc = (a0f + a1f*z + a2f*z*z)/(P1plus*phif);
+   double F1func = (a0F1 + a1F1*z + a2F1*z*z)/(P1plus*phiF1);
+   double F2func = (a0F2 + a1F2*z + a2F2*z*z)/(P0min*phiF2);
+   
+   double hVw = mB*sqrt(rDstar)*gfunc;
+   double hA1w = ffunc/(mB*sqrt(rDstar)*(1+w));
+   double hA2w = hA1w/(1-w) + (F1func*(w-rDstar) - F2func*mB*mB*rDstar*(wsq-1))/(mB*mB*sqrt(rDstar)*u*(wsq-1));
+   double hA3w = (F1func*(rDstar*w-1) + mB*mB*sqrt(rDstar)*(1+w)*(F2func*rDstar*sqrt(rDstar)*(w-1) + hA1w*w*u))/(mB*mB*sqrt(rDstar)*u*(wsq-1));
+   
+  // arXiv:1309.0301 Eq 48b
+  double cA1 = (m_b-m_c)*rmBsV*hA1w, cV = (m_b+m_c)*rmBaV*hVw;
+  double hT1 = (0.5*((1-rDstar)*(1-rDstar)*(w+1)*cA1
+		  -(1+rDstar)*(1+rDstar)*(w-1)*cV))/u;
+  double hT2 = (0.5*(1-r2Dstar)*(w+1)*(cA1 - cV))/u;
+  double hT3 = (-0.5*(2*rDstar*(w+1)*cA1
+				+(m_b-m_c)*rmBsV*u*(hA3w-rDstar*hA2w)
+				-(1+rDstar)*(1+rDstar)*cV))/(u*(1+rDstar));
+ 
+// BGL Parametrization ends here.
+/************************************************************************************/ 
+
+// Form Factors :  
 // arXiv:1309.0301 Eq 39
   T1 = mBaV*hT1 - mBsV*hT2;
   T2 = (mBaV-q2*rmBaV)*hT1 - (mBsV-q2*rmBsV)*hT2;
