@@ -10,3 +10,7 @@ To make sure that the BTODSTARLNUNP decay model is working properly, use the scr
 So, if you wanted to generate 10,000,000 B0 decays, you would use:
 
 ./run_dstarlnu -n 10000000 -b B0 -u dstarlnu_np.dec -o filename.root
+
+If you want to simulate BBbar pairs in the Belle II environment from the Upsilon(4S) resonance, use the Makefile to make the run_dstarlnu2 script. To generate a distribution, edit BB_dstarlnu_np.dec to include whatever new physics coefficients you would like. The command follows exactly the same as above, but with run_dstarlnu2. As an example, if you wanted to generate 10,000,000 B0 decays, you would use:
+
+./run_dstarlnu2 -n 10000000 -b B0 -u BB_dstarlnu_np.dec -o filename.root
